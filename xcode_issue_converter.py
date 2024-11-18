@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox, scrolledtext
+from tkinter import messagebox, scrolledtext, ttk
 import re
 
 def extract_issues(text):
@@ -30,6 +30,9 @@ def convert_and_copy():
     # Get the input text from the input text area
     input_text = input_text_area.get("1.0", tk.END).strip()
     
+    if not input_text:  # Don't process if empty
+        return
+        
     # Extract and format the issues
     converted_text = extract_issues(input_text)
     
@@ -48,6 +51,14 @@ def convert_and_copy():
     status_label.config(text="✓ Converted and copied to clipboard!")
     # Reset the status message after 2 seconds
     root.after(2000, lambda: status_label.config(text=""))
+
+def on_paste(event):
+    # After paste, if auto-convert is enabled, trigger conversion
+    root.after(50, check_for_paste)  # Small delay to ensure paste completes
+
+def check_for_paste():
+    if auto_convert_var.get() and input_text_area.get("1.0", tk.END).strip():
+        convert_and_copy()
 
 def on_input_click(event):
     # Check if there's text in the input area
@@ -73,6 +84,17 @@ input_text_area = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=90, height
 input_text_area.pack(padx=10, pady=10)
 # Bind the click event to the input text area
 input_text_area.bind('<Button-1>', on_input_click)
+# Bind paste event (Command+V or right-click paste)
+input_text_area.bind('<<Paste>>', on_paste)
+
+# Auto-convert checkbox
+auto_convert_var = tk.BooleanVar()
+auto_convert_checkbox = ttk.Checkbutton(
+    root, 
+    text="Auto Convert on Paste", 
+    variable=auto_convert_var
+)
+auto_convert_checkbox.pack()
 
 # Convert button
 convert_button = tk.Button(root, text="Extract & Convert to XML", command=convert_and_copy)
