@@ -36,13 +36,19 @@ def convert_and_copy():
     # Extract and format the issues
     converted_text = extract_issues(input_text)
     
+    # Get pretext if any
+    pretext = pretext_entry.get().strip()
+    
+    # Combine pretext with converted text if pretext exists
+    final_text = f"{pretext}\n\n{converted_text}" if pretext else converted_text
+    
     # Clear and update the output text area
     output_text_area.delete("1.0", tk.END)
-    output_text_area.insert(tk.END, converted_text)
+    output_text_area.insert(tk.END, final_text)
     
     # Automatically copy to clipboard
     root.clipboard_clear()
-    root.clipboard_append(converted_text)
+    root.clipboard_append(final_text)
     
     # Clear the input text area
     input_text_area.delete("1.0", tk.END)
@@ -95,6 +101,16 @@ auto_convert_checkbox = ttk.Checkbutton(
     variable=auto_convert_var
 )
 auto_convert_checkbox.pack()
+
+# Pretext field
+pretext_frame = tk.Frame(root)
+pretext_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+pretext_label = tk.Label(pretext_frame, text="Message Pretext:")
+pretext_label.pack(side=tk.LEFT, padx=(0, 10))
+
+pretext_entry = tk.Entry(pretext_frame, width=80)
+pretext_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
 # Convert button
 convert_button = tk.Button(root, text="Extract & Convert to XML", command=convert_and_copy)
