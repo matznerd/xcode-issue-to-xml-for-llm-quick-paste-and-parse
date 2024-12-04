@@ -1,6 +1,35 @@
 import tkinter as tk
 from tkinter import messagebox, scrolledtext, ttk
 import re
+import json
+import os
+from pathlib import Path
+
+# Ensure profiles directory exists
+PROFILES_DIR = Path.home() / '.xcode_converter_profiles'
+PROFILES_DIR.mkdir(exist_ok=True)
+PROFILES_FILE = PROFILES_DIR / 'profiles.json'
+LAST_PROFILE_FILE = PROFILES_DIR / 'last_profile.txt'
+
+def load_profiles():
+    if PROFILES_FILE.exists():
+        with open(PROFILES_FILE, 'r') as f:
+            return json.load(f)
+    return {}  # Return empty dict if no profiles exist
+
+def save_profiles(profiles):
+    with open(PROFILES_FILE, 'w') as f:
+        json.dump(profiles, f, indent=2)
+
+def save_last_profile(profile_name):
+    with open(LAST_PROFILE_FILE, 'w') as f:
+        f.write(profile_name)
+
+def load_last_profile():
+    if LAST_PROFILE_FILE.exists():
+        with open(LAST_PROFILE_FILE, 'r') as f:
+            return f.read().strip()
+    return None
 
 def extract_issues(text):
     # Find all lines that match the clean summary format
@@ -102,10 +131,93 @@ def on_input_click(event):
         input_text_area.see(tk.INSERT)
         return 'break'  # Prevents the default click behavior
 
+def save_current_profile():
+    profile_name = profile_var.get()
+    if not profile_name:
+        messagebox.showerror("Error", "Please select or enter a profile name")
+        return
+        
+    profiles = load_profiles()
+    profiles[profile_name] = {
+        'pretext': pretext_text.get("1.0", tk.END).strip(),
+        'posttext': posttext_text.get("1.0", tk.END).strip()
+    }
+    save_profiles(profiles)
+    save_last_profile(profile_name)
+    
+    # Update profile dropdown if it's a new profile
+    current_values = list(profile_dropdown['values'])
+    if profile_name not in current_values:
+        current_values.append(profile_name)
+        profile_dropdown['values'] = sorted(current_values)
+    
+    messagebox.showinfo("Success", f"Profile '{profile_name}' saved successfully!")
+
+def load_profile(*args):  # *args to handle both manual and trace callbacks
+    profile_name = profile_var.get()
+    if not profile_name:
+        return
+        
+    profiles = load_profiles()
+    if profile_name in profiles:
+        profile = profiles[profile_name]
+        pretext_text.delete("1.0", tk.END)
+        pretext_text.insert("1.0", profile.get('pretext', ''))
+        posttext_text.delete("1.0", tk.END)
+        posttext_text.insert("1.0", profile.get('posttext', ''))
+        save_last_profile(profile_name)
+
+def delete_profile():
+    profile_name = profile_var.get()
+    if not profile_name:
+        messagebox.showerror("Error", "Please select a profile to delete")
+        return
+        
+    if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete profile '{profile_name}'?"):
+        profiles = load_profiles()
+        if profile_name in profiles:
+            del profiles[profile_name]
+            save_profiles(profiles)
+            
+            # Update profile dropdown
+            profile_dropdown['values'] = sorted(profiles.keys())
+            if profiles:
+                profile_var.set(list(profiles.keys())[0])
+            else:
+                profile_var.set('')
+            
+            messagebox.showinfo("Success", f"Profile '{profile_name}' deleted successfully!")
+
 # Create the main window
 root = tk.Tk()
 root.title("Xcode Issue XML Converter")
-root.geometry("800x800")  # Made window taller to accommodate all elements
+root.geometry("800x800")
+
+# Profile management frame
+profile_frame = tk.Frame(root)
+profile_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
+
+profile_label = tk.Label(profile_frame, text="Profile:")
+profile_label.pack(side=tk.LEFT, padx=(0, 10))
+
+profile_var = tk.StringVar()
+profiles = load_profiles()
+
+profile_dropdown = ttk.Combobox(profile_frame, textvariable=profile_var, values=sorted(profiles.keys()))
+profile_dropdown.pack(side=tk.LEFT, padx=(0, 10))
+profile_dropdown.bind('<<ComboboxSelected>>', load_profile)
+
+save_profile_btn = tk.Button(profile_frame, text="Save Profile", command=save_current_profile)
+save_profile_btn.pack(side=tk.LEFT, padx=(0, 10))
+
+delete_profile_btn = tk.Button(profile_frame, text="Delete Profile", command=delete_profile)
+delete_profile_btn.pack(side=tk.LEFT)
+
+# Load last used profile
+last_profile = load_last_profile()
+if last_profile and last_profile in profiles:
+    profile_var.set(last_profile)
+    load_profile()
 
 # Input text area
 input_label = tk.Label(root, text="Paste Xcode Issue Output:")
