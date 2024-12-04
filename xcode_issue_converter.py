@@ -6,18 +6,38 @@ def extract_issues(text):
     # Find all lines that match the clean summary format
     issues = []
     lines = text.strip().split('\n')
+    
+    # System paths to exclude
+    system_paths = ['Xcode.app', '/Applications/', '/Library/']
+    
+    # Error patterns to include
+    error_patterns = [
+        r'No such module',
+        r'failed',
+        r'Failed',
+        r'error:',
+        r'warning:',
+        r'fatal error:',
+        r'undefined symbol'
+    ]
+    
     for line in lines:
-        # Match lines that start with a path but:
-        # 1. Don't have 'error:' or 'note:'
-        # 2. Don't contain Xcode.app or other system paths
-        # 3. Must be an actual issue line (usually contains a colon followed by a message)
-        if (line.strip().startswith('/') and 
-            not any(x in line for x in ['error:', 'note:', 'Xcode.app', '/Applications/', '/Library/']) and
-            ': ' in line):  # This ensures it's an actual issue line
+        line = line.strip()
+        
+        # Skip empty lines and system paths
+        if not line or any(path in line for path in system_paths):
+            continue
+            
+        # Check if line contains any error pattern or starts with a path and contains a message
+        if (any(pattern.lower() in line.lower() for pattern in error_patterns) or
+            (line.startswith('/') and ': ' in line)):
             
             # Remove any existing XML tags that might be in the text
-            clean_line = re.sub(r'</?issue\d*>', '', line.strip())
-            issues.append(clean_line)
+            clean_line = re.sub(r'</?issue\d*>', '', line)
+            
+            # Don't add duplicate issues
+            if clean_line not in issues:
+                issues.append(clean_line)
     
     # Format each issue with numbered tags
     formatted_issues = []
@@ -36,11 +56,16 @@ def convert_and_copy():
     # Extract and format the issues
     converted_text = extract_issues(input_text)
     
-    # Get pretext if any
-    pretext = pretext_entry.get().strip()
+    # Get pretext and post-text if any
+    pretext = pretext_text.get("1.0", tk.END).strip()
+    posttext = posttext_text.get("1.0", tk.END).strip()
     
-    # Combine pretext with converted text if pretext exists
-    final_text = f"{pretext}\n\n{converted_text}" if pretext else converted_text
+    # Combine pretext, converted text, and post-text
+    final_text = converted_text
+    if pretext:
+        final_text = f"{pretext}\n\n{final_text}"
+    if posttext:
+        final_text = f"{final_text}\n\n{posttext}"
     
     # Clear and update the output text area
     output_text_area.delete("1.0", tk.END)
@@ -80,7 +105,7 @@ def on_input_click(event):
 # Create the main window
 root = tk.Tk()
 root.title("Xcode Issue XML Converter")
-root.geometry("800x600")
+root.geometry("800x800")  # Made window taller to accommodate all elements
 
 # Input text area
 input_label = tk.Label(root, text="Paste Xcode Issue Output:")
@@ -104,13 +129,13 @@ auto_convert_checkbox.pack()
 
 # Pretext field
 pretext_frame = tk.Frame(root)
-pretext_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+pretext_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
 
-pretext_label = tk.Label(pretext_frame, text="Message Pretext:")
-pretext_label.pack(side=tk.LEFT, padx=(0, 10))
+pretext_label = tk.Label(pretext_frame, text="Message Pre-Text:")
+pretext_label.pack(anchor='w', padx=(0, 10))
 
-pretext_entry = tk.Entry(pretext_frame, width=80)
-pretext_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+pretext_text = scrolledtext.ScrolledText(pretext_frame, wrap=tk.WORD, width=90, height=3)
+pretext_text.pack(fill=tk.X, expand=True)
 
 # Convert button
 convert_button = tk.Button(root, text="Extract & Convert to XML", command=convert_and_copy)
@@ -119,6 +144,16 @@ convert_button.pack(pady=10)
 # Status label (for copy confirmation)
 status_label = tk.Label(root, text="", fg="green")
 status_label.pack()
+
+# Post-text field
+posttext_frame = tk.Frame(root)
+posttext_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+posttext_label = tk.Label(posttext_frame, text="Message Post-Text:")
+posttext_label.pack(anchor='w', padx=(0, 10))
+
+posttext_text = scrolledtext.ScrolledText(posttext_frame, wrap=tk.WORD, width=90, height=3)
+posttext_text.pack(fill=tk.X, expand=True)
 
 # Output text area
 output_label = tk.Label(root, text="Extracted Issues in XML:")
